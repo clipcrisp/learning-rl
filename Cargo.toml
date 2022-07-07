@@ -1,6 +1,7 @@
 [package]
 name = "learning-rl"
 version = "0.1.0"
+authors = ["clipcrisp"]
 edition = "2021"
 
 
