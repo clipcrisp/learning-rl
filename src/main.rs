@@ -58,8 +58,14 @@ fn player_input(point: &mut Point, ctx: &mut BTerm) {
 
                 
 fn main() -> BError {
-    let context = BTermBuilder::simple80x50()
+
+    let custom_font = "/home/clipcrisp/Source/learning-rl/res/polyducks_12x12.png";
+    
+    let context = BTermBuilder::new()
+        .with_font(custom_font, 12, 12)
         .with_title("Generic Fantasy RL")
+        .with_simple_console(80, 50, custom_font)
+        .with_fps_cap(30.0)
         .build()?;
 
     let gs: State = State {
