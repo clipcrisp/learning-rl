@@ -1,83 +1,142 @@
-use bracket_lib::prelude::*;
-use std::cmp::{max, min};
+use raylib::prelude::*;
+
+struct Config {
+    window_x: i32,
+    window_y: i32,
+    tile_size: i32,
+    tiles_x: usize,
+    tiles_y: usize,
+    x_offset: i32,
+    y_offset: i32,
+    font_path: String,
+}
+
+struct GameData {
+    player: Player,
+    default_tile: char,
+    grid: Vec<Vec<char>>,
+}
 
 struct Player {
-    name: String,
-    pos: Point,
-    render: Renderable,
+    symbol: char,
+    pos: Vector2,
 }
 
-struct Point {
-    x: i32,
-    y: i32,
-}
-
-struct Renderable {
-    glyph: FontCharType,
-    fg: RGB,
-    bg: RGB,
-}
-
-struct State {
-    player: Player,
-}
-
-impl GameState for State {
-    fn tick(&mut self, ctx: &mut BTerm) {
-        ctx.cls();
-
-        player_input(&mut self.player.pos, ctx);
-        ctx.print(1, 1, "Hellow Bracket World");
-        ctx.set(
-            self.player.pos.x,
-            self.player.pos.y,
-            self.player.render.fg,
-            self.player.render.bg,
-            self.player.render.glyph,
-        );
+impl Config {
+    fn new(window_x: i32, window_y: i32, tile_size: i32) -> Config {
+        Config {
+            window_x: window_x,
+            window_y: window_y,
+            tile_size: tile_size,
+            tiles_x: (window_x / tile_size) as usize,
+            tiles_y: (window_y / tile_size) as usize,
+            x_offset: window_x % tile_size,
+            y_offset: window_y % tile_size,
+            font_path: String::from("res/Greybeard-16pxB.ttf")
+        }
     }
 }
 
-fn try_move_player(delta_x: i32, delta_y: i32, pos: &mut Point) {
-    pos.x = min(79, max(0, pos.x + delta_x));
-    pos.y = min(49, max(0, pos.y + delta_y));
-}
-
-fn player_input(point: &mut Point, ctx: &mut BTerm) {
-    match ctx.key {
-        None => {}
-        Some(key) => match key {
-            VirtualKeyCode::Left => try_move_player(-1, 0, point),
-            VirtualKeyCode::Right => try_move_player(1, 0, point),
-            VirtualKeyCode::Up => try_move_player(0, -1, point),
-            VirtualKeyCode::Down => try_move_player(0, 1, point),
-            _ => {}
-        },
+impl GameData {
+    fn new(default_tile: char, config: &Config) -> GameData {
+        GameData {
+            player: Player::new(config),
+            default_tile: default_tile,
+            grid:
+            vec![vec![ default_tile; config.tiles_x]; config.tiles_y],
+        }
     }
 }
 
-                
-fn main() -> BError {
+impl Player {
+    fn new(config: &Config) -> Player {
+        Player {
+            symbol: '@',
+            pos: Vector2::new(
+                (config.tiles_x / 2) as f32,
+                (config.tiles_y / 2) as f32)
+        }
+    }
+}
 
-    let custom_font = "/home/clipcrisp/Source/learning-rl/res/polyducks_12x12.png";
+fn main() {
+    let config = Config::new(1366, 768, 16);
+    let mut gd = GameData::new('.', &config);
+
+    let (mut rl, thread) = raylib::init()
+        .size(config.window_x, config.window_y)
+        .title("Generic Roguelike")
+        .build();
+    rl.set_target_fps(60);
+    let rl_font = rl
+        .load_font(&thread, &config.font_path)
+        .expect("Couldn't load font");
+
+    while !rl.window_should_close() {
+        update_game(&mut gd, &rl);
+        draw_game(&gd, &config, &mut rl, &thread, &rl_font);
+    }
+}
+
+fn draw_game (gd: &GameData, config: &Config, rl: &mut RaylibHandle,
+              thread: &RaylibThread, rl_font: &Font) {
     
-    let context = BTermBuilder::new()
-        .with_font(custom_font, 12, 12)
-        .with_title("Generic Fantasy RL")
-        .with_simple_console(80, 50, custom_font)
-        .with_fps_cap(30.0)
-        .build()?;
+    let mut d = rl.begin_drawing(&thread);
+    d.clear_background(Color::BLACK);
 
-    let gs: State = State {
-        player: Player {
-            name: "Protag Anist".to_string(),
-            pos: Point { x: 40, y: 25 },
-            render: Renderable {
-                glyph: to_cp437('@'),
-                fg: RGB::named(YELLOW),
-                bg: RGB::named(BLACK),
-            },
-        },
-    };
-    main_loop(context, gs)
+    draw_tiles(&mut d, &config, &gd.grid, &rl_font);
 }
+
+fn draw_tiles (d: &mut RaylibDrawHandle, config: &Config,
+               tiles: &Vec<Vec<char>>, font: &Font) {
+    
+    let mut cursor: Vector2 =
+        Vector2::new((0 + config.x_offset) as f32,
+                     (0 + config.y_offset) as f32);
+    
+    let mut first_row = true;
+    for row in tiles.iter() {
+        if first_row == true { first_row = false; }
+        else {
+            cursor = cursor + Vector2::new(0.0, 16.0);
+            cursor.x = (0 + config.x_offset) as f32;
+        }
+        
+        for tile in row.iter() {
+            d.draw_text_ex(font, &tile.to_string(),
+                           cursor,
+                           config.tile_size as f32,
+                           0.0,
+                           Color::ORANGE);
+            cursor = cursor + Vector2::new(16.0, 0.0);
+        }
+    }
+}
+
+fn update_game (gd: &mut GameData, rl: &RaylibHandle) {
+    player_input(gd, &rl);
+
+    gd.grid[gd.player.pos.y as usize][gd.player.pos.x as usize]
+        = gd.player.symbol;
+}
+
+fn player_input (gd: &mut GameData, rl: &RaylibHandle) {
+    use raylib::consts::KeyboardKey::*;
+    let lastkey: KeyboardKey;
+    
+    if rl.is_key_down(KEY_UP) || rl.is_key_down(KEY_K) {
+        try_move_player(0, -1, &mut gd.player.pos);
+    } else if rl.is_key_down(KEY_RIGHT) || rl.is_key_down(KEY_L) {
+        try_move_player(1, 0, &mut gd.player.pos);
+    } else if rl.is_key_down(KEY_DOWN) || rl.is_key_down(KEY_J) {
+        try_move_player(0, 1, &mut gd.player.pos);
+    } else if rl.is_key_down(KEY_LEFT) || rl.is_key_down(KEY_H) {
+        try_move_player(-1, 0, &mut gd.player.pos);
+    }
+}
+
+fn try_move_player(delta_x: i32, delta_y: i32, pos: &mut Vector2) {
+    pos.x = pos.x + delta_x as f32;
+    pos.y = pos.y + delta_y as f32;
+}
+
