@@ -98,7 +98,7 @@ fn draw_tiles (d: &mut RaylibDrawHandle, config: &Config,
     for row in tiles.iter() {
         if first_row == true { first_row = false; }
         else {
-            cursor = cursor + Vector2::new(0.0, 16.0);
+            cursor = cursor + Vector2::new(0.0, config.tile_size as f32); 
             cursor.x = (0 + config.x_offset) as f32;
         }
         
@@ -108,12 +108,14 @@ fn draw_tiles (d: &mut RaylibDrawHandle, config: &Config,
                            config.tile_size as f32,
                            0.0,
                            Color::ORANGE);
-            cursor = cursor + Vector2::new(16.0, 0.0);
+            cursor = cursor + Vector2::new(config.tile_size as f32, 0.0);
         }
     }
 }
 
 fn update_game (gd: &mut GameData, rl: &RaylibHandle) {
+    clear_grid(&mut gd.grid);
+    
     player_input(gd, &rl);
 
     gd.grid[gd.player.pos.y as usize][gd.player.pos.x as usize]
@@ -140,3 +142,10 @@ fn try_move_player(delta_x: i32, delta_y: i32, pos: &mut Vector2) {
     pos.y = pos.y + delta_y as f32;
 }
 
+fn clear_grid(grid: &mut Vec<Vec<char>>) {
+    for row in grid.iter_mut() {
+        for tile in row.iter_mut() {
+            *tile = '.';
+        }
+    }
+}
