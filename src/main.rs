@@ -60,7 +60,7 @@ impl Player {
 }
 
 fn main() {
-    let config = Config::new(1366, 768, 16);
+    let config = Config::new(1366, 768, 32);
     let mut gd = GameData::new('.', &config);
 
     let (mut rl, thread) = raylib::init()
@@ -71,8 +71,11 @@ fn main() {
     let rl_font = rl
         .load_font(&thread, &config.font_path)
         .expect("Couldn't load font");
-
+    let mut delta_time = 0.0;
+    
     while !rl.window_should_close() {
+        delta_time = rl.get_frame_time();
+        
         update_game(&mut gd, &rl);
         draw_game(&gd, &config, &mut rl, &thread, &rl_font);
     }
@@ -126,13 +129,13 @@ fn player_input (gd: &mut GameData, rl: &RaylibHandle) {
     use raylib::consts::KeyboardKey::*;
     let lastkey: KeyboardKey;
     
-    if rl.is_key_down(KEY_UP) || rl.is_key_down(KEY_K) {
+    if rl.is_key_pressed(KEY_UP) || rl.is_key_pressed(KEY_K) {
         try_move_player(0, -1, &mut gd.player.pos);
-    } else if rl.is_key_down(KEY_RIGHT) || rl.is_key_down(KEY_L) {
+    } else if rl.is_key_pressed(KEY_RIGHT) || rl.is_key_pressed(KEY_L) {
         try_move_player(1, 0, &mut gd.player.pos);
-    } else if rl.is_key_down(KEY_DOWN) || rl.is_key_down(KEY_J) {
+    } else if rl.is_key_pressed(KEY_DOWN) || rl.is_key_pressed(KEY_J) {
         try_move_player(0, 1, &mut gd.player.pos);
-    } else if rl.is_key_down(KEY_LEFT) || rl.is_key_down(KEY_H) {
+    } else if rl.is_key_pressed(KEY_LEFT) || rl.is_key_pressed(KEY_H) {
         try_move_player(-1, 0, &mut gd.player.pos);
     }
 }
