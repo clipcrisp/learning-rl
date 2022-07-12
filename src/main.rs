@@ -13,13 +13,20 @@ struct Config {
 
 struct GameData {
     player: Player,
-    default_tile: char,
-    grid: Vec<Vec<char>>,
+    default_tile: Tile,
+    grid: Vec<Vec<Tile>>,
 }
 
 struct Player {
-    symbol: char,
+    tile: Tile,
     pos: Vector2,
+}
+
+#[derive(Copy, Clone)]
+struct Tile {
+    symbol: char,
+    color: Color,
+    passable: bool,
 }
 
 impl Config {
@@ -38,7 +45,7 @@ impl Config {
 }
 
 impl GameData {
-    fn new(default_tile: char, config: &Config) -> GameData {
+    fn new(default_tile: Tile, config: &Config) -> GameData {
         GameData {
             player: Player::new(config),
             default_tile: default_tile,
@@ -51,7 +58,11 @@ impl GameData {
 impl Player {
     fn new(config: &Config) -> Player {
         Player {
-            symbol: '@',
+            tile: Tile {
+                symbol: '@',
+                color: Color::GREEN,
+                passable: false
+            },
             pos: Vector2::new(
                 (config.tiles_x / 2) as f32,
                 (config.tiles_y / 2) as f32)
@@ -60,8 +71,13 @@ impl Player {
 }
 
 fn main() {
+    let default_tile = Tile {
+        symbol: '.',
+        color: Color::ORANGE,
+        passable: true
+    };
     let config = Config::new(1366, 768, 32);
-    let mut gd = GameData::new('.', &config);
+    let mut gd = GameData::new(default_tile, &config);
 
     let (mut rl, thread) = raylib::init()
         .size(config.window_x, config.window_y)
@@ -91,7 +107,7 @@ fn draw_game (gd: &GameData, config: &Config, rl: &mut RaylibHandle,
 }
 
 fn draw_tiles (d: &mut RaylibDrawHandle, config: &Config,
-               tiles: &Vec<Vec<char>>, font: &Font) {
+               tiles: &Vec<Vec<Tile>>, font: &Font) {
     
     let mut cursor: Vector2 =
         Vector2::new((0 + config.x_offset) as f32,
@@ -106,11 +122,11 @@ fn draw_tiles (d: &mut RaylibDrawHandle, config: &Config,
         }
         
         for tile in row.iter() {
-            d.draw_text_ex(font, &tile.to_string(),
+            d.draw_text_ex(font, &tile.symbol.to_string(),
                            cursor,
                            config.tile_size as f32,
                            0.0,
-                           Color::ORANGE);
+                           &tile.color);
             cursor = cursor + Vector2::new(config.tile_size as f32, 0.0);
         }
     }
@@ -122,7 +138,7 @@ fn update_game (gd: &mut GameData, rl: &RaylibHandle) {
     player_input(gd, &rl);
 
     gd.grid[gd.player.pos.y as usize][gd.player.pos.x as usize]
-        = gd.player.symbol;
+        = gd.player.tile;
 }
 
 fn player_input (gd: &mut GameData, rl: &RaylibHandle) {
@@ -145,10 +161,10 @@ fn try_move_player(delta_x: i32, delta_y: i32, pos: &mut Vector2) {
     pos.y = pos.y + delta_y as f32;
 }
 
-fn clear_grid(grid: &mut Vec<Vec<char>>) {
+fn clear_grid(grid: &mut Vec<Vec<Tile>>) {
     for row in grid.iter_mut() {
         for tile in row.iter_mut() {
-            *tile = '.';
+            tile.symbol = '.';
         }
     }
 }
