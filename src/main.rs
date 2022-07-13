@@ -165,6 +165,7 @@ fn clear_grid(grid: &mut Vec<Vec<Tile>>) {
     for row in grid.iter_mut() {
         for tile in row.iter_mut() {
             tile.symbol = '.';
+            tile.color = Color::ORANGE;
         }
     }
 }
