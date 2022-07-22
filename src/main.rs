@@ -1,5 +1,13 @@
 use raylib::prelude::*;
 
+struct Game {
+    config: Config,
+    gd: GameData,
+    rl: RaylibHandle,
+    thread: RaylibThread,
+    res: Res,
+}
+
 struct Config {
     window_x: i32,
     window_y: i32,
@@ -8,25 +16,54 @@ struct Config {
     tiles_y: usize,
     x_offset: i32,
     y_offset: i32,
-    font_path: String,
 }
 
 struct GameData {
-    player: Player,
+    entity: Entity,
     default_tile: Tile,
     grid: Vec<Vec<Tile>>,
 }
 
-struct Player {
+struct Res {
+    rl_font: Font,
+}
+struct Entity { 
     tile: Tile,
     pos: Vector2,
 }
 
+//TODO, make two sets of tiles, one passable, one not.
 #[derive(Copy, Clone)]
 struct Tile {
     symbol: char,
     color: Color,
     passable: bool,
+}
+
+impl Game {
+    fn new(window_x: i32, window_y: i32, tile_size: i32) -> Game {
+        let config = Config::new(window_x, window_y, tile_size); 
+        
+        let gd = GameData::new(
+                Tile {symbol: '.', color: Color::ORANGE, passable: true },
+                &config);
+
+        let (mut rl, thread) = raylib::init()
+            .size(config.window_x, config.window_y)
+            .title("Generic Roguelike")
+            .build();
+        rl.set_target_fps(60);
+       
+        let res = Res::new(&mut rl, &thread);
+
+        Game {
+            config: config,
+            gd: gd,
+            rl: rl,
+            thread: thread,
+            res: res 
+        }
+    }
 }
 
 impl Config {
@@ -38,8 +75,7 @@ impl Config {
             tiles_x: (window_x / tile_size) as usize,
             tiles_y: (window_y / tile_size) as usize,
             x_offset: window_x % tile_size,
-            y_offset: window_y % tile_size,
-            font_path: String::from("res/Greybeard-16pxB.ttf")
+            y_offset: window_y % tile_size
         }
     }
 }
@@ -47,7 +83,7 @@ impl Config {
 impl GameData {
     fn new(default_tile: Tile, config: &Config) -> GameData {
         GameData {
-            player: Player::new(config),
+            entity: Entity::new(config),
             default_tile: default_tile,
             grid:
             vec![vec![ default_tile; config.tiles_x]; config.tiles_y],
@@ -55,9 +91,21 @@ impl GameData {
     }
 }
 
-impl Player {
-    fn new(config: &Config) -> Player {
-        Player {
+impl Res {
+    fn new(rl: &mut RaylibHandle, thread: &RaylibThread) -> Res {
+        let font_path = String::from("res/Greybeard-16pxB.ttf");
+        let rl_font = rl.load_font(&thread, &font_path)
+            .expect("Couldn't load font");
+
+        Res {
+            rl_font: rl_font 
+        }
+    }
+}
+
+impl Entity {
+    fn new(config: &Config) -> Entity {
+        Entity {
             tile: Tile {
                 symbol: '@',
                 color: Color::GREEN,
@@ -71,31 +119,15 @@ impl Player {
 }
 
 fn main() {
-    let default_tile = Tile {
-        symbol: '.',
-        color: Color::ORANGE,
-        passable: true
-    };
-    let config = Config::new(1366, 768, 32);
-    let mut gd = GameData::new(default_tile, &config);
-
-    let (mut rl, thread) = raylib::init()
-        .size(config.window_x, config.window_y)
-        .title("Generic Roguelike")
-        .build();
-    rl.set_target_fps(60);
-    let rl_font = rl
-        .load_font(&thread, &config.font_path)
-        .expect("Couldn't load font");
-    let mut delta_time = 0.0;
+    let mut game = Game::new(1366, 768, 32);
     
-    while !rl.window_should_close() {
-        delta_time = rl.get_frame_time();
-        
-        update_game(&mut gd, &rl);
-        draw_game(&gd, &config, &mut rl, &thread, &rl_font);
+    while !game.rl.window_should_close() {  
+        update_game(&mut game.gd, &game.rl);
+        draw_game(&game.gd, &game.config, &mut game.rl,
+                  &game.thread, &game.res.rl_font);
     }
 }
+
 
 fn draw_game (gd: &GameData, config: &Config, rl: &mut RaylibHandle,
               thread: &RaylibThread, rl_font: &Font) {
@@ -137,8 +169,8 @@ fn update_game (gd: &mut GameData, rl: &RaylibHandle) {
     
     player_input(gd, &rl);
 
-    gd.grid[gd.player.pos.y as usize][gd.player.pos.x as usize]
-        = gd.player.tile;
+    gd.grid[gd.entity.pos.y as usize][gd.entity.pos.x as usize]
+        = gd.entity.tile;
 }
 
 fn player_input (gd: &mut GameData, rl: &RaylibHandle) {
@@ -146,17 +178,17 @@ fn player_input (gd: &mut GameData, rl: &RaylibHandle) {
     let lastkey: KeyboardKey;
     
     if rl.is_key_pressed(KEY_UP) || rl.is_key_pressed(KEY_K) {
-        try_move_player(0, -1, &mut gd.player.pos);
+        try_move_entity(0, -1, &mut gd.entity.pos);
     } else if rl.is_key_pressed(KEY_RIGHT) || rl.is_key_pressed(KEY_L) {
-        try_move_player(1, 0, &mut gd.player.pos);
+        try_move_entity(1, 0, &mut gd.entity.pos);
     } else if rl.is_key_pressed(KEY_DOWN) || rl.is_key_pressed(KEY_J) {
-        try_move_player(0, 1, &mut gd.player.pos);
+        try_move_entity(0, 1, &mut gd.entity.pos);
     } else if rl.is_key_pressed(KEY_LEFT) || rl.is_key_pressed(KEY_H) {
-        try_move_player(-1, 0, &mut gd.player.pos);
+        try_move_entity(-1, 0, &mut gd.entity.pos);
     }
 }
 
-fn try_move_player(delta_x: i32, delta_y: i32, pos: &mut Vector2) {
+fn try_move_entity(delta_x: i32, delta_y: i32, pos: &mut Vector2) {
     pos.x = pos.x + delta_x as f32;
     pos.y = pos.y + delta_y as f32;
 }
