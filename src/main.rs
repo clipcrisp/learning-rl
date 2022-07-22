@@ -19,9 +19,10 @@ struct Config {
 }
 
 struct GameData {
-    entity: Entity,
+    player: Entity,
     default_tile: Tile,
     grid: Vec<Vec<Tile>>,
+    entities: Vec<Entity>,
 }
 
 struct Res {
@@ -36,7 +37,8 @@ struct Entity {
 #[derive(Copy, Clone)]
 struct Tile {
     symbol: char,
-    color: Color,
+    fg_color: Color,
+    bg_color: Color,
     passable: bool,
 }
 
@@ -45,7 +47,8 @@ impl Game {
         let config = Config::new(window_x, window_y, tile_size); 
         
         let gd = GameData::new(
-                Tile {symbol: '.', color: Color::ORANGE, passable: true },
+                Tile {symbol: '.', fg_color: Color::ORANGE, 
+                    bg_color: Color::BLACK, passable: true },
                 &config);
 
         let (mut rl, thread) = raylib::init()
@@ -74,8 +77,8 @@ impl Config {
             tile_size: tile_size,
             tiles_x: (window_x / tile_size) as usize,
             tiles_y: (window_y / tile_size) as usize,
-            x_offset: window_x % tile_size,
-            y_offset: window_y % tile_size
+            x_offset: (window_x % tile_size) / 2,
+            y_offset: (window_y % tile_size) / 2
         }
     }
 }
@@ -83,10 +86,11 @@ impl Config {
 impl GameData {
     fn new(default_tile: Tile, config: &Config) -> GameData {
         GameData {
-            entity: Entity::new(config),
+            player: Entity::new_player(&config), 
             default_tile: default_tile,
             grid:
             vec![vec![ default_tile; config.tiles_x]; config.tiles_y],
+            entities: Vec::new()
         }
     }
 }
@@ -104,11 +108,12 @@ impl Res {
 }
 
 impl Entity {
-    fn new(config: &Config) -> Entity {
+    fn new_player(config: &Config) -> Entity {
         Entity {
             tile: Tile {
                 symbol: '@',
-                color: Color::GREEN,
+                fg_color: Color::GREEN,
+                bg_color: Color::WHITE,
                 passable: false
             },
             pos: Vector2::new(
@@ -120,7 +125,7 @@ impl Entity {
 
 fn main() {
     let mut game = Game::new(1366, 768, 32);
-    
+
     while !game.rl.window_should_close() {  
         update_game(&mut game.gd, &game.rl);
         draw_game(&game.gd, &game.config, &mut game.rl,
@@ -140,7 +145,10 @@ fn draw_game (gd: &GameData, config: &Config, rl: &mut RaylibHandle,
 
 fn draw_tiles (d: &mut RaylibDrawHandle, config: &Config,
                tiles: &Vec<Vec<Tile>>, font: &Font) {
-    
+    let mut rect_size: Vector2 = Vector2::new(config.tile_size as f32, 
+                                              config.tile_size as f32); 
+    let mut text_offset: Vector2 = Vector2::new(5 as f32, 3 as f32); 
+
     let mut cursor: Vector2 =
         Vector2::new((0 + config.x_offset) as f32,
                      (0 + config.y_offset) as f32);
@@ -154,11 +162,13 @@ fn draw_tiles (d: &mut RaylibDrawHandle, config: &Config,
         }
         
         for tile in row.iter() {
+            d.draw_rectangle_v(cursor, rect_size, &tile.bg_color);
+
             d.draw_text_ex(font, &tile.symbol.to_string(),
-                           cursor,
+                           cursor + text_offset,
                            config.tile_size as f32,
                            0.0,
-                           &tile.color);
+                           &tile.fg_color);
             cursor = cursor + Vector2::new(config.tile_size as f32, 0.0);
         }
     }
@@ -167,24 +177,24 @@ fn draw_tiles (d: &mut RaylibDrawHandle, config: &Config,
 fn update_game (gd: &mut GameData, rl: &RaylibHandle) {
     clear_grid(&mut gd.grid);
     
-    player_input(gd, &rl);
+    player_input(&mut gd.player, &rl);
 
-    gd.grid[gd.entity.pos.y as usize][gd.entity.pos.x as usize]
-        = gd.entity.tile;
+    gd.grid[gd.player.pos.y as usize][gd.player.pos.x as usize]
+        = gd.player.tile;
 }
 
-fn player_input (gd: &mut GameData, rl: &RaylibHandle) {
+fn player_input (player: &mut Entity, rl: &RaylibHandle) {
     use raylib::consts::KeyboardKey::*;
     let lastkey: KeyboardKey;
     
     if rl.is_key_pressed(KEY_UP) || rl.is_key_pressed(KEY_K) {
-        try_move_entity(0, -1, &mut gd.entity.pos);
+        try_move_entity(0, -1, &mut player.pos);
     } else if rl.is_key_pressed(KEY_RIGHT) || rl.is_key_pressed(KEY_L) {
-        try_move_entity(1, 0, &mut gd.entity.pos);
+        try_move_entity(1, 0, &mut player.pos);
     } else if rl.is_key_pressed(KEY_DOWN) || rl.is_key_pressed(KEY_J) {
-        try_move_entity(0, 1, &mut gd.entity.pos);
+        try_move_entity(0, 1, &mut player.pos);
     } else if rl.is_key_pressed(KEY_LEFT) || rl.is_key_pressed(KEY_H) {
-        try_move_entity(-1, 0, &mut gd.entity.pos);
+        try_move_entity(-1, 0, &mut player.pos);
     }
 }
 
@@ -197,7 +207,8 @@ fn clear_grid(grid: &mut Vec<Vec<Tile>>) {
     for row in grid.iter_mut() {
         for tile in row.iter_mut() {
             tile.symbol = '.';
-            tile.color = Color::ORANGE;
+            tile.fg_color = Color::ORANGE;
+            tile.bg_color = Color::BLACK;
         }
     }
 }
